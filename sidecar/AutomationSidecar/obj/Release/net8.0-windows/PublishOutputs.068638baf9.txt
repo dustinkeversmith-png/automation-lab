@@ -1,0 +1,5 @@
+C:\users\Cutie Magic 500\automation-lab\sidecar\AutomationSidecar\publish\AutomationSidecar.exe
+C:\users\Cutie Magic 500\automation-lab\sidecar\AutomationSidecar\publish\AutomationSidecar.dll
+C:\users\Cutie Magic 500\automation-lab\sidecar\AutomationSidecar\publish\AutomationSidecar.deps.json
+C:\users\Cutie Magic 500\automation-lab\sidecar\AutomationSidecar\publish\AutomationSidecar.runtimeconfig.json
+C:\users\Cutie Magic 500\automation-lab\sidecar\AutomationSidecar\publish\AutomationSidecar.pdb

@@ -1,0 +1,14 @@
+C:\users\Cutie Magic 500\automation-lab\sidecar\AutomationSidecar\bin\Release\net8.0-windows\AutomationSidecar.exe
+C:\users\Cutie Magic 500\automation-lab\sidecar\AutomationSidecar\bin\Release\net8.0-windows\AutomationSidecar.deps.json
+C:\users\Cutie Magic 500\automation-lab\sidecar\AutomationSidecar\bin\Release\net8.0-windows\AutomationSidecar.runtimeconfig.json
+C:\users\Cutie Magic 500\automation-lab\sidecar\AutomationSidecar\bin\Release\net8.0-windows\AutomationSidecar.dll
+C:\users\Cutie Magic 500\automation-lab\sidecar\AutomationSidecar\bin\Release\net8.0-windows\AutomationSidecar.pdb
+C:\users\Cutie Magic 500\automation-lab\sidecar\AutomationSidecar\obj\Release\net8.0-windows\AutomationSidecar.GeneratedMSBuildEditorConfig.editorconfig
+C:\users\Cutie Magic 500\automation-lab\sidecar\AutomationSidecar\obj\Release\net8.0-windows\AutomationSidecar.AssemblyInfoInputs.cache
+C:\users\Cutie Magic 500\automation-lab\sidecar\AutomationSidecar\obj\Release\net8.0-windows\AutomationSidecar.AssemblyInfo.cs
+C:\users\Cutie Magic 500\automation-lab\sidecar\AutomationSidecar\obj\Release\net8.0-windows\AutomationSidecar.csproj.CoreCompileInputs.cache
+C:\users\Cutie Magic 500\automation-lab\sidecar\AutomationSidecar\obj\Release\net8.0-windows\AutomationSidecar.dll
+C:\users\Cutie Magic 500\automation-lab\sidecar\AutomationSidecar\obj\Release\net8.0-windows\refint\AutomationSidecar.dll
+C:\users\Cutie Magic 500\automation-lab\sidecar\AutomationSidecar\obj\Release\net8.0-windows\AutomationSidecar.pdb
+C:\users\Cutie Magic 500\automation-lab\sidecar\AutomationSidecar\obj\Release\net8.0-windows\AutomationSidecar.genruntimeconfig.cache
+C:\users\Cutie Magic 500\automation-lab\sidecar\AutomationSidecar\obj\Release\net8.0-windows\ref\AutomationSidecar.dll

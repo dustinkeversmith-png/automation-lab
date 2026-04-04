@@ -1,0 +1,39 @@
+{
+  "name": "automation-lab",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist-electron/main/main.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "test": "vitest run ChromiumDebugAdapter",
+    "test:watch": "vitest",
+    "smoke:all": "tsx tests/realEnvironmentSmoke.ts all",
+    "smoke:cdp": "tsx tests/realEnvironmentSmoke.ts cdp",
+    "smoke:httpjson": "tsx tests/realEnvironmentSmoke.ts httpjson",
+    "smoke:sidecar": "tsx tests/realEnvironmentSmoke.ts sidecar",
+    "smoke:vlc": "tsx tests/realEnvironmentSmoke.ts vlc",
+    "smoke:adb": "tsx tests/realEnvironmentSmoke.ts adb"
+  },
+  "dependencies": {
+    "@types/ws": "^8.18.1",
+    "bufferutil": "^4.1.0",
+    "dotenv": "^17.4.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "tsx": "^4.21.0",
+    "utf-8-validate": "^6.0.6",
+    "ws": "^8.20.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "electron": "^37.2.0",
+    "electron-vite": "^3.1.0",
+    "typescript": "^5.8.3",
+    "vite": "^6.0.0",
+    "vitest": "^3.2.4"
+  }
+}

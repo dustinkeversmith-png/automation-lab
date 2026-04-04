@@ -1,0 +1,27 @@
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+}
+
+.page {
+  padding: 20px;
+}
+
+.toolbar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+button {
+  padding: 10px 14px;
+  cursor: pointer;
+}
+
+pre {
+  background: #111;
+  color: #ddd;
+  padding: 16px;
+  border-radius: 8px;
+  overflow: auto;
+}
