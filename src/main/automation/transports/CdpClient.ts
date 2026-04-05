@@ -22,7 +22,7 @@ export class CdpClient {
       this.cleanupSocket();
     }
 
-    console.log(`Connecting to CDP at ${webSocketDebuggerUrl}...`);
+    //console.log(`Connecting to CDP at ${webSocketDebuggerUrl}...`);
 
     return await new Promise<void>(
       
@@ -113,18 +113,18 @@ export class CdpClient {
       ws.on("message", (raw) => {
         const text = raw.toString();
 
-        console.log("Received CDP message:", text);
+        //console.log("Received CDP message:", text);
 
         let msg: CdpResponseMessage;
         try {
           msg = JSON.parse(text) as CdpResponseMessage;
         } catch (err) {
-          console.log("Ignoring malformed CDP JSON message:", err);
+          //console.log("Ignoring malformed CDP JSON message:", err);
           return;
         }
 
         if (typeof msg.id !== "number") {
-          console.log("Ignoring CDP event or message without numeric id");
+         // console.log("Ignoring CDP event or message without numeric id");
           return;
         }
 
@@ -143,7 +143,12 @@ export class CdpClient {
           return;
         }
 
-        console.log(`CDP command with id ${msg.id} succeeded:`, msg.result);
+        // Limit msg.result to 100 chars for logging
+        const resultPreview =
+          msg.result && typeof msg.result === "object"
+            ? JSON.stringify(msg.result).slice(0, 100)
+            : String(msg.result);
+        console.log(`CDP command with id ${msg.id} succeeded:`, resultPreview);
         pending.resolve(msg.result);
       });
     });
@@ -158,10 +163,10 @@ export class CdpClient {
     const id = ++this.idCounter;
     const payload = { id, method, params };
 
-    console.log("Sending CDP command:", payload);
+    //console.log("Sending CDP command:", payload);
 
     return await new Promise<unknown>((resolve, reject) => {
-      console.log(`Registering pending CDP command with id ${id}`);
+      //console.log(`Registering pending CDP command with id ${id}`);
       this.pending.set(id, { resolve, reject });
 
       try {
@@ -179,7 +184,7 @@ export class CdpClient {
               );
             }
           } else {
-            console.log(`CDP command ${id} sent successfully`);
+            //console.log(`CDP command ${id} sent successfully`);
             const pending = this.pending.get(id);
             if (!pending) {
               console.log(
@@ -187,15 +192,16 @@ export class CdpClient {
               );
               return;
             }
-            console.log(`Payload sending succeeded for CDP command ${id}, awaiting response...`);
+            //console.log(`Payload sending succeeded for CDP command ${id}, awaiting response...`);
 
-            pending.resolve(payload);
+            // TODO REMOVE
+            //pending.resolve(payload);
           }
         });
 
 
       } catch (err) {
-        console.log(`Synchronous failure sending CDP command ${id}:`, err);
+        //console.log(`Synchronous failure sending CDP command ${id}:`, err);
 
         this.pending.delete(id);
         reject(

@@ -15,7 +15,8 @@
     "smoke:sidecar": "tsx tests/realEnvironmentSmoke.ts sidecar",
     "smoke:vlc": "tsx tests/realEnvironmentSmoke.ts vlc",
     "smoke:adb": "tsx tests/realEnvironmentSmoke.ts adb",
-    "smoke:adb-transform": "tsx tests/realEnvironmentSmoke.ts adb-transform"
+    "smoke:adb-transform": "tsx tests/realEnvironmentSmoke.ts adb-transform",
+    "smoke:chrom-web-player": "tsx tests/chromiumWebPlayerTest.ts"
   },
   "dependencies": {
     "@types/ws": "^8.18.1",

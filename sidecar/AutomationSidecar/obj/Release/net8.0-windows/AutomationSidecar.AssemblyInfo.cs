@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("AutomationSidecar")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+1f0c3b859945261936e20adfce7975a6b0fa2384")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+a5761d582b7ab5ac7f2d1d2ec22b13e722106ef7")]
 [assembly: System.Reflection.AssemblyProductAttribute("AutomationSidecar")]
 [assembly: System.Reflection.AssemblyTitleAttribute("AutomationSidecar")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

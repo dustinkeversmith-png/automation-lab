@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\Cutie Magic 500\\automation-lab\\sidecar\\automationsidecar\\AutomationSidecar.csproj": {}
+    "C:\\Users\\Cutie Magic 500\\automation-lab\\sidecar\\AutomationSidecar\\AutomationSidecar.csproj": {}
   },
   "projects": {
-    "C:\\Users\\Cutie Magic 500\\automation-lab\\sidecar\\automationsidecar\\AutomationSidecar.csproj": {
+    "C:\\Users\\Cutie Magic 500\\automation-lab\\sidecar\\AutomationSidecar\\AutomationSidecar.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\Cutie Magic 500\\automation-lab\\sidecar\\automationsidecar\\AutomationSidecar.csproj",
+        "projectUniqueName": "C:\\Users\\Cutie Magic 500\\automation-lab\\sidecar\\AutomationSidecar\\AutomationSidecar.csproj",
         "projectName": "AutomationSidecar",
-        "projectPath": "C:\\Users\\Cutie Magic 500\\automation-lab\\sidecar\\automationsidecar\\AutomationSidecar.csproj",
+        "projectPath": "C:\\Users\\Cutie Magic 500\\automation-lab\\sidecar\\AutomationSidecar\\AutomationSidecar.csproj",
         "packagesPath": "C:\\Users\\Cutie Magic 500\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\Cutie Magic 500\\automation-lab\\sidecar\\automationsidecar\\obj\\",
+        "outputPath": "C:\\Users\\Cutie Magic 500\\automation-lab\\sidecar\\AutomationSidecar\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
