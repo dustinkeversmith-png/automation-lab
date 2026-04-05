@@ -6,6 +6,12 @@ type Pending = {
   timeout?: NodeJS.Timeout;
 };
 
+type SidecarResponse = {
+  id: number;
+  result?: unknown;
+  Error?: string | null;
+};
+
 export class SidecarClient {
   private child: ChildProcessWithoutNullStreams | null = null;
   private idCounter = 0;
@@ -14,7 +20,11 @@ export class SidecarClient {
   private startedExePath: string | null = null;
   private startedArgsKey: string | null = null;
 
-start(exePath: string, args: string[] = []): void {
+
+
+
+
+  start(exePath: string, args: string[] = []): void {
     const argsKey = JSON.stringify(args);
 
     if (this.child) {
@@ -39,42 +49,7 @@ start(exePath: string, args: string[] = []): void {
 
       this.buffer += text;
 
-      let index = this.buffer.indexOf("\n");
-      while (index >= 0) {
-        const line = this.buffer.slice(0, index).trim();
-        this.buffer = this.buffer.slice(index + 1);
-
-        if (line) {
-          try {
-            const msg = JSON.parse(line) as {
-              id?: number;
-              result?: unknown;
-              error?: string;
-            };
-
-            console.log("Received message from sidecar:", msg);
-
-            if (typeof msg.id === "number") {
-              const pending = this.pending.get(msg.id);
-              if (pending) {
-                this.pending.delete(msg.id);
-                if (pending.timeout) clearTimeout(pending.timeout);
-
-                if (msg.error) pending.reject(new Error(msg.error));
-                else pending.resolve(msg.result);
-              }
-            }
-          } catch (error) {
-            console.log(
-              "Ignoring malformed JSON message from sidecar:",
-              line,
-              error
-            );
-          }
-        }
-
-        index = this.buffer.indexOf("\n");
-      }
+      this.processBufferedOutput();
     });
 
     this.child.stderr.on("data", (chunk) => {
@@ -159,9 +134,70 @@ start(exePath: string, args: string[] = []): void {
           if (current?.timeout) clearTimeout(current.timeout);
           this.pending.delete(id);
           reject(new Error(`Failed to write to sidecar stdin: ${error.message}`));
+        }else {
+          console.log(`Successfully sent message to sidecar for method "${method}" with id ${id}`);
         }
       });
     });
+  }
+
+  private processBufferedOutput(): void {
+    let newlineIndex = this.buffer.indexOf("\n");
+
+    while (newlineIndex >= 0) {
+      const rawLine = this.buffer.slice(0, newlineIndex);
+      this.buffer = this.buffer.slice(newlineIndex + 1);
+
+      const line = rawLine.trim();
+      if (line.length > 0) {
+        this.handleOutputLine(line);
+      }
+
+      newlineIndex = this.buffer.indexOf("\n");
+    }
+  }
+
+  private handleOutputLine(line: string): void {
+    let msg: SidecarResponse;
+
+    try {
+      msg = JSON.parse(line) as SidecarResponse;
+    } catch (error) {
+      console.log(
+        "Ignoring malformed JSON message from sidecar:",
+        line,
+        error
+      );
+      return;
+    }
+
+    console.log("Received message from sidecar:", msg);
+
+    if (typeof msg.id !== "number") {
+      console.log("Ignoring sidecar JSON message without numeric id:", msg);
+      return;
+    }
+
+    const pending = this.pending.get(msg.id);
+    if (!pending) {
+      console.log(`No pending sidecar request found for id ${msg.id}`);
+      return;
+    }
+
+    console.log(`Found pending request for id ${msg.id}, resolving/rejecting...`);
+
+    this.pending.delete(msg.id);
+    if (pending.timeout) clearTimeout(pending.timeout);
+
+    if (msg.Error) {
+
+      console.log(`Sidecar responded with error for id ${msg.id}: ${msg.Error}`);
+      pending.reject(new Error(msg.Error));
+      return;
+    }
+
+    console.log(`Resolving pending request for id ${msg.id} with result:`, msg.result);
+    pending.resolve(msg.result);
   }
 
   private rejectAllPending(error: Error): void {

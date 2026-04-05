@@ -12,3 +12,4 @@ C:\users\Cutie Magic 500\automation-lab\sidecar\AutomationSidecar\obj\Release\ne
 C:\users\Cutie Magic 500\automation-lab\sidecar\AutomationSidecar\obj\Release\net8.0-windows\AutomationSidecar.pdb
 C:\users\Cutie Magic 500\automation-lab\sidecar\AutomationSidecar\obj\Release\net8.0-windows\AutomationSidecar.genruntimeconfig.cache
 C:\users\Cutie Magic 500\automation-lab\sidecar\AutomationSidecar\obj\Release\net8.0-windows\ref\AutomationSidecar.dll
+C:\Users\Cutie Magic 500\automation-lab\sidecar\automationsidecar\obj\Release\net8.0-windows\AutomationSidecar.sourcelink.json

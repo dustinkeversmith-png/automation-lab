@@ -50,7 +50,8 @@ export class AdbAdapter extends ChromiumDebugAdapter {
     );
     this.sidecar.start(sidecarExe, sidecarArgs);
 
-    await this.sidecar.send(
+    // The response should launch and return the childID.
+    const launched = await this.sidecar.send(
       "launchProcess",
       {
         exePath: meta.adbPath ?? "adb",
@@ -63,9 +64,21 @@ export class AdbAdapter extends ChromiumDebugAdapter {
         detached: true,
       },
       { timeoutMs: 10000 }
-    );
+    ) as { processId: number };
 
-    // Check that the side car has started.
+  
+
+
+    console.log(`Resulting launched PID from sidecar launchProcess command for session ${sessionId}: ${JSON.stringify(launched)}`);
+
+    const pid = launched.processId;
+
+    if (typeof pid !== "number" || !Number.isFinite(pid) || pid <= 0) {
+      throw new Error(`Invalid PID returned from sidecar: ${pid}`);
+    }
+
+
+    // Oh the side car will send it back neverminnd.
 
 
     try {
@@ -74,6 +87,13 @@ export class AdbAdapter extends ChromiumDebugAdapter {
       );
 
       console.log(`PID before ensureAdbBrowserReady: ${state.pid}`);
+
+      
+      this.sessions.update(sessionId, {
+        meta: {
+          pid: pid,
+        }
+      });
 
       const connected = await super.connect(sessionId);
       // Attempting to connect to the debug port.
@@ -86,6 +106,7 @@ export class AdbAdapter extends ChromiumDebugAdapter {
           ...(connected.meta ?? {}),
           ...meta,
           mode: "cdp",
+          pid: pid,
           debugPort,
           launchUrl: launchUrl || undefined,
           bringToFront
@@ -103,6 +124,7 @@ export class AdbAdapter extends ChromiumDebugAdapter {
         meta: {
           ...meta,
           mode: "uia",
+          pid: pid,
           debugPort,
           launchUrl: launchUrl || undefined,
           bringToFront
@@ -112,7 +134,48 @@ export class AdbAdapter extends ChromiumDebugAdapter {
   }
 
 
-  
+  async transformWindow(sessionId: string, params: {
+    width? : number;
+    height? : number;
+    x? : number;
+    y? : number;
+    minimize? : boolean;
+    maximize? : boolean;
+    bringToFront? : boolean;
+    processId?: number;
+  }): Promise<void> {
+
+
+
+    const state = await this.getState(sessionId);
+
+    
+
+    const processId = state.meta?.pid;
+
+    if (typeof processId !== "number" || !Number.isFinite(processId) || processId <= 0) {
+      throw new Error(`No valid processId found for session ${sessionId}`);
+    }
+
+
+    params.processId = processId;
+
+    console.log(`Sending transformWindow command to sidecar for session ${sessionId} with params: ${JSON.stringify(params)}`);
+
+    await new Promise((r) => setTimeout(r, 1500));
+
+    await this.sidecar.send("transformWindow", {
+      ...params,
+    });
+
+
+
+
+  };
+
+
+
+
   
 
 }

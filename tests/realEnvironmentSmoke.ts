@@ -148,6 +148,8 @@ async function smokeCdpClient(): Promise<SmokeResult> {
   }
 }
 
+
+
 async function smokeVlcHttpAdapter(): Promise<SmokeResult> {
   const sessions = new SessionRegistry();
   const adapter = new VlcHttpAdapter(sessions);
@@ -231,6 +233,44 @@ async function smokeAdbAdapter(): Promise<SmokeResult> {
   };
 }
 
+async function smoketransformAdbAdapter(): Promise<SmokeResult> {
+  const sessions = new SessionRegistry();
+  const adapter = new AdbAdapter(sessions);
+
+  const created = sessions.create({
+    appKind: "adb-browser",
+    state: "running",
+    capabilities: ["launch", "attach", "navigate", "dom", "close"],
+    pid: undefined,
+    meta: {
+      debugPort: envNum("SMOKE_ADB_DEBUG_PORT", 9222),
+      sidecarExe: process.env.SMOKE_SIDECAR_EXE ?? "",
+      sidecarArgs: [],
+      adbPath: process.env.SMOKE_ADB_EXE ?? "",
+    },
+  });
+
+  const snapshot = await adapter.connect(created.sessionId);
+
+  
+
+  let commandResult: unknown;
+
+  commandResult = await adapter.transformWindow(created.sessionId, {
+    width: 800,
+    height: 600,
+  });
+
+  return {
+    name: "AdbAdapter Transform",
+    ok: true,
+    detail: {
+      snapshot,
+      commandResult,
+    },
+  };
+}
+
 async function main(): Promise<void> {
   const target = (process.argv[2] ?? "all").toLowerCase();
   const results: SmokeResult[] = [];
@@ -272,6 +312,10 @@ async function main(): Promise<void> {
 
   if (target === "adb" || target === "all") {
     await run("AdbAdapter", smokeAdbAdapter);
+  }
+
+  if (target === "adb-transform" || target === "all") {
+    await run("AdbAdapter Transform", smoketransformAdbAdapter);
   }
 
   printHeader("Summary");

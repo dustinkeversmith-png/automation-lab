@@ -14,7 +14,8 @@
     "smoke:httpjson": "tsx tests/realEnvironmentSmoke.ts httpjson",
     "smoke:sidecar": "tsx tests/realEnvironmentSmoke.ts sidecar",
     "smoke:vlc": "tsx tests/realEnvironmentSmoke.ts vlc",
-    "smoke:adb": "tsx tests/realEnvironmentSmoke.ts adb"
+    "smoke:adb": "tsx tests/realEnvironmentSmoke.ts adb",
+    "smoke:adb-transform": "tsx tests/realEnvironmentSmoke.ts adb-transform"
   },
   "dependencies": {
     "@types/ws": "^8.18.1",
