@@ -233,6 +233,75 @@ async function smokeAdbAdapter(): Promise<SmokeResult> {
   };
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function smokeAdbWindowStateTransitions(): Promise<SmokeResult> {
+  const sessions = new SessionRegistry();
+  const adapter = new AdbAdapter(sessions);
+
+  const created = sessions.create({
+    appKind: "adb-browser",
+    state: "running",
+    capabilities: ["launch", "attach", "navigate", "dom", "close"],
+    pid: undefined,
+    meta: {
+      debugPort: envNum("SMOKE_ADB_DEBUG_PORT", 9222),
+      sidecarExe: process.env.SMOKE_SIDECAR_EXE ?? "",
+      sidecarArgs: [],
+      adbPath: process.env.SMOKE_ADB_EXE ?? "",
+    },
+  });
+
+  const snapshot = await adapter.connect(created.sessionId);
+
+  const steps: Array<{ step: string; result: unknown }> = [];
+
+  steps.push({
+    step: "resize-baseline",
+    result: await adapter.resizeWindow(created.sessionId, 1000, 700),
+  });
+
+  await sleep(500);
+
+  steps.push({
+    step: "minimize",
+    result: await adapter.minimizeWindow(created.sessionId),
+  });
+
+  await sleep(500);
+
+  steps.push({
+    step: "restore-and-focus",
+    result: await adapter.focusWindow(created.sessionId),
+  });
+
+  await sleep(500);
+
+  steps.push({
+    step: "maximize",
+    result: await adapter.maximizeWindow(created.sessionId),
+  });
+
+  await sleep(500);
+
+  steps.push({
+    step: "bring-to-front",
+    result: await adapter.bringWindowToFront(created.sessionId),
+  });
+
+  return {
+    name: "AdbAdapter Window State Transitions",
+    ok: true,
+    detail: {
+      snapshot,
+      steps,
+    },
+  };
+}
+
+
 async function smoketransformAdbAdapter(): Promise<SmokeResult> {
   const sessions = new SessionRegistry();
   const adapter = new AdbAdapter(sessions);
@@ -317,6 +386,11 @@ async function main(): Promise<void> {
   if (target === "adb-transform" || target === "all") {
     await run("AdbAdapter Transform", smoketransformAdbAdapter);
   }
+
+  if (target === "adb-window-states" || target === "all") {
+    await run("AdbAdapter Window State Transitions", smokeAdbWindowStateTransitions);
+  }
+
 
   printHeader("Summary");
   for (const result of results) {

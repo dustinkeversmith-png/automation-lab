@@ -30,6 +30,15 @@ async function send(
   return result;
 }
 
+async function logWebFrameSnapshot(
+  adapter: ChromiumDebugAdapter,
+  sessionId: string
+): Promise<void> {
+  const snapshot = await send(adapter, sessionId, "getWebFrameDebugSnapshot");
+  console.log("\n=== Web frame snapshot ===");
+  console.dir(snapshot, { depth: 8 });
+}
+
 function getBrowserExe(): string {
   const fromEnv =
     process.env.CHROME_EXE ||
@@ -398,16 +407,19 @@ async function inspectIframe(
   iframeSelector: string
 ): Promise<void> {
 
-    await adapter.send(sessionId, {
+  await adapter.send(sessionId, {
     type: "waitForIframeReady",
     payload: {
-        iframeSelector: "#iframe-embed",
-        loadingSelector: "#embed-loading",
-        timeoutMs: 20000,
-        pollMs: 300,
-        requiredFrameSelector: "video, button, [role='button']"
+      iframeSelector: "#iframe-embed",
+      loadingSelector: "#embed-loading",
+      timeoutMs: 20000,
+      pollMs: 300,
+      requiredFrameSelector: "video, button, [role='button']",
+      expectedIframeSrcIncludes: "rapid-cloud.co"
     }
-    });
+  });
+
+    await logWebFrameSnapshot(adapter, sessionId);
 
 
 
@@ -589,6 +601,10 @@ async function main() {
   console.log("Session created:", created.sessionId);
 
   const snapshot = await adapter.connect(created.sessionId);
+
+  
+
+  await logWebFrameSnapshot(adapter, created.sessionId);
   console.log("Connect snapshot:", snapshot);
 
   assert(snapshot.state === "ready", "Expected session state to be 'ready'");
@@ -640,6 +656,8 @@ async function main() {
       })
     `,
   });
+
+  await logWebFrameSnapshot(adapter, created.sessionId);
 
   console.log("\n=== Initial iframe inspection ===");
   await inspectIframe(adapter, created.sessionId, iframeSelector);

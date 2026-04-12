@@ -1,4 +1,5 @@
 import { WebSocket } from "ws";
+import { CdpWebFrameExtension, type CdpEventMessage } from "./CdpWebFrameExtension";
 
 type Pending = {
   resolve: (value: unknown) => void;
@@ -9,6 +10,9 @@ type CdpResponseMessage = {
   id?: number;
   result?: unknown;
   error?: { message?: string };
+  sessionId?: string;
+  method?: string;
+  params?: any;
 };
 
 export class CdpClient {
@@ -17,16 +21,16 @@ export class CdpClient {
   private readonly pending = new Map<number, Pending>();
   private isConnected = false;
 
+  readonly webFrames = new CdpWebFrameExtension(
+    (method, params, sessionId) => this.send(method, params, sessionId)
+  );
+
   async connect(webSocketDebuggerUrl: string): Promise<void> {
     if (this.ws) {
       this.cleanupSocket();
     }
 
-    //console.log(`Connecting to CDP at ${webSocketDebuggerUrl}...`);
-
-    return await new Promise<void>(
-      
-      (resolve, reject) => {
+    return await new Promise<void>((resolve, reject) => {
       let settled = false;
 
       const ws = new WebSocket(webSocketDebuggerUrl);
@@ -49,22 +53,15 @@ export class CdpClient {
         console.log("Connected to CDP");
         this.isConnected = true;
         resolve();
-
-
       };
 
       ws.on("open", () => {
         succeedConnect();
-
-        return;
-
       });
 
       ws.on("error", (err) => {
         const error = err instanceof Error ? err : new Error(String(err));
         console.log("Error connecting to CDP:", error);
-
-        throw error;
 
         if (!settled) {
           failConnect(error);
@@ -113,65 +110,71 @@ export class CdpClient {
       ws.on("message", (raw) => {
         const text = raw.toString();
 
-        //console.log("Received CDP message:", text);
-
         let msg: CdpResponseMessage;
         try {
           msg = JSON.parse(text) as CdpResponseMessage;
-        } catch (err) {
-          //console.log("Ignoring malformed CDP JSON message:", err);
+        } catch {
           return;
         }
 
-        if (typeof msg.id !== "number") {
-         // console.log("Ignoring CDP event or message without numeric id");
+        if (typeof msg.id === "number") {
+          const pending = this.pending.get(msg.id);
+          if (!pending) {
+            console.log(`No pending CDP command found for id ${msg.id}`);
+            return;
+          }
+
+          this.pending.delete(msg.id);
+
+          if (msg.error) {
+            const message = msg.error.message ?? "Unknown CDP error";
+            console.log(`CDP command with id ${msg.id} failed:`, message);
+            pending.reject(new Error(message));
+            return;
+          }
+
+          const resultPreview =
+            msg.result && typeof msg.result === "object"
+              ? JSON.stringify(msg.result).slice(0, 100)
+              : String(msg.result);
+
+          console.log(`CDP command with id ${msg.id} succeeded:`, resultPreview);
+          pending.resolve(msg.result);
           return;
         }
 
-        const pending = this.pending.get(msg.id);
-        if (!pending) {
-          console.log(`No pending CDP command found for id ${msg.id}`);
-          return;
-        }
-
-        this.pending.delete(msg.id);
-
-        if (msg.error) {
-          const message = msg.error.message ?? "Unknown CDP error";
-          console.log(`CDP command with id ${msg.id} failed:`, message);
-          pending.reject(new Error(message));
-          return;
-        }
-
-        // Limit msg.result to 100 chars for logging
-        const resultPreview =
-          msg.result && typeof msg.result === "object"
-            ? JSON.stringify(msg.result).slice(0, 100)
-            : String(msg.result);
-        console.log(`CDP command with id ${msg.id} succeeded:`, resultPreview);
-        pending.resolve(msg.result);
+        this.webFrames.handleEventMessage(msg as CdpEventMessage).catch((error) => {
+          console.log("CdpWebFrameExtension event handling failed:", error);
+        });
       });
     });
   }
 
-  async send(method: string, params?: Record<string, unknown>): Promise<unknown> {
+  async send(
+    method: string,
+    params?: Record<string, unknown>,
+    sessionId?: string
+  ): Promise<unknown> {
     if (!this.ws || !this.isConnected || this.ws.readyState !== WebSocket.OPEN) {
       console.log("CDP not connected");
       throw new Error("CDP not connected");
     }
 
     const id = ++this.idCounter;
-    const payload = { id, method, params };
+    const payload: Record<string, unknown> = { id, method };
 
-    //console.log("Sending CDP command:", payload);
+    if (params !== undefined) {
+      payload.params = params;
+    }
+
+    if (sessionId) {
+      payload.sessionId = sessionId;
+    }
 
     return await new Promise<unknown>((resolve, reject) => {
-      //console.log(`Registering pending CDP command with id ${id}`);
       this.pending.set(id, { resolve, reject });
 
       try {
-
-
         this.ws!.send(JSON.stringify(payload), (err?: Error) => {
           if (err) {
             console.log(`Failed to send CDP command ${id}:`, err);
@@ -183,26 +186,9 @@ export class CdpClient {
                 new Error(`Failed to send CDP command: ${err.message}`)
               );
             }
-          } else {
-            //console.log(`CDP command ${id} sent successfully`);
-            const pending = this.pending.get(id);
-            if (!pending) {
-              console.log(
-                `Pending CDP command with id ${id} not found after send callback`
-              );
-              return;
-            }
-            //console.log(`Payload sending succeeded for CDP command ${id}, awaiting response...`);
-
-            // TODO REMOVE
-            //pending.resolve(payload);
           }
         });
-
-
       } catch (err) {
-        //console.log(`Synchronous failure sending CDP command ${id}:`, err);
-
         this.pending.delete(id);
         reject(
           err instanceof Error
@@ -210,8 +196,6 @@ export class CdpClient {
             : new Error("Unknown error while sending CDP command")
         );
       }
-
-
     });
   }
 
@@ -293,5 +277,6 @@ export class CdpClient {
 
     this.ws = null;
     this.isConnected = false;
+    this.webFrames.reset();
   }
 }

@@ -134,6 +134,60 @@ export class AdbAdapter extends ChromiumDebugAdapter {
   }
 
 
+  async minimizeWindow(sessionId: string): Promise<unknown> {
+    return await this.transformWindow(sessionId, {
+      minimize: true,
+    });
+  }
+
+  async maximizeWindow(sessionId: string): Promise<unknown> {
+    return await this.transformWindow(sessionId, {
+      maximize: true,
+    });
+  }
+
+  async bringWindowToFront(sessionId: string): Promise<unknown> {
+    return await this.transformWindow(sessionId, {
+      bringToFront: true,
+    });
+  }
+
+  async focusWindow(sessionId: string): Promise<unknown> {
+    // alias of bringToFront (same behavior in sidecar)
+    return await this.transformWindow(sessionId, {
+      bringToFront: true,
+    });
+  }
+
+  async restoreWindow(sessionId: string): Promise<unknown> {
+    // restore is implicitly done via bringToFront in your sidecar
+    return await this.transformWindow(sessionId, {
+      bringToFront: true,
+    });
+  }
+
+  async resizeWindow(
+    sessionId: string,
+    width: number,
+    height: number
+  ): Promise<unknown> {
+    return await this.transformWindow(sessionId, {
+      width,
+      height,
+    });
+  }
+
+  async moveWindow(
+    sessionId: string,
+    x: number,
+    y: number
+  ): Promise<unknown> {
+    return await this.transformWindow(sessionId, {
+      x,
+      y,
+    });
+  }
+
   async transformWindow(sessionId: string, params: {
     width? : number;
     height? : number;

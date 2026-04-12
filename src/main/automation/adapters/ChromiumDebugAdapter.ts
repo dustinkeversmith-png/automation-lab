@@ -150,13 +150,16 @@ export class ChromiumDebugAdapter extends BaseAdapter {
       console.error("Failed to connect to CDP:", error);
       throw new Error("Failed to connect to CDP");
     }
-
+    
     console.log("Connected to CDP, enabling domains...");
-
+    // Setting some target discovery parameters?
+    await client.webFrames.initialize();
+    
     await client.send("Page.enable");
     await client.send("Runtime.enable");
     await client.send("DOM.enable");
     await client.send("CSS.enable");
+
 
     this.clients.set(sessionId, client);
 
@@ -235,6 +238,8 @@ export class ChromiumDebugAdapter extends BaseAdapter {
             requiredFrameSelector: (command.payload as any).requiredFrameSelector ?? null
           }
         );
+      case "getWebFrameDebugSnapshot":
+        return client.webFrames.getFrameDebugSnapshot();
       case "clickInFrame":
         return await this.clickInFrame(
           client,
@@ -378,45 +383,83 @@ export class ChromiumDebugAdapter extends BaseAdapter {
     }
   }
 
-  private async createFrameContext(
-    client: CdpClient,
-    frameId: string
-  ): Promise<number> {
+private async createFrameContextWithRetry(
+  client: CdpClient,
+  frameId: string,
+  attempts: number = 10,
+  delayMs: number = 300
+): Promise<{ contextId: number; sessionId?: string }> {
+  let lastError: unknown;
 
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await this.createFrameContextWithRetry(client, frameId);
+    } catch (error) {
+      lastError = error;
+      const message = error instanceof Error ? error.message : String(error);
 
-    const stillPresent = await this.canUseFrameInCurrentSession(client, frameId);
-  if (!stillPresent) {
-    throw new Error(`Frame ${frameId} is no longer present in the current CDP session; likely cross-origin/OOPIF`);
+      if (
+        message.includes("No frame for given id found") ||
+        message.includes("likely cross-origin/OOPIF")
+      ) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        continue;
+      }
+
+      throw error;
+    }
   }
 
-    const world = (await client.send("Page.createIsolatedWorld", {
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("Failed to create frame context after retries");
+}
+
+private async createFrameContext(
+  client: CdpClient,
+  frameId: string
+): Promise<{ contextId: number; sessionId?: string }> {
+  const frameSessionId = client.webFrames.getSessionIdForFrame(frameId) ?? undefined;
+
+  const world = (await client.send(
+    "Page.createIsolatedWorld",
+    {
       frameId,
       worldName: "automation-lab",
       grantUniversalAccess: true
-    })) as PageCreateIsolatedWorldResult;
+    },
+    frameSessionId
+  )) as PageCreateIsolatedWorldResult;
 
-    const contextId = world?.executionContextId;
-    if (!contextId) {
-      throw new Error(`Failed to create execution context for frame ${frameId}`);
-    }
-
-    return contextId;
+  const contextId = world?.executionContextId;
+  if (!contextId) {
+    throw new Error(
+      `Failed to create execution context for frame ${frameId} (session ${frameSessionId ?? "root"})`
+    );
   }
 
-  private async evaluateInFrameContext(
-    client: CdpClient,
-    contextId: number,
-    expression: string,
-    returnByValue: boolean = true,
-    awaitPromise: boolean = true
-  ): Promise<RuntimeEvaluateResult> {
-    return (await client.send("Runtime.evaluate", {
+  return { contextId, sessionId: frameSessionId };
+}
+
+private async evaluateInFrameContext(
+  client: CdpClient,
+  contextId: number,
+  expression: string,
+  returnByValue: boolean = true,
+  awaitPromise: boolean = true,
+  sessionId?: string
+): Promise<RuntimeEvaluateResult> {
+  return (await client.send(
+    "Runtime.evaluate",
+    {
       contextId,
       expression,
       returnByValue,
       awaitPromise
-    })) as RuntimeEvaluateResult;
-  }
+    },
+    sessionId
+  )) as RuntimeEvaluateResult;
+}
 
   private async evaluateInFrame(
     client: CdpClient,
@@ -424,8 +467,8 @@ export class ChromiumDebugAdapter extends BaseAdapter {
     expression: string
   ): Promise<RuntimeEvaluateResult> {
     const frameId = await this.getFrameIdForIframe(client, iframeSelector);
-    const contextId = await this.createFrameContext(client, frameId);
-    return await this.evaluateInFrameContext(client, contextId, expression, true, true);
+    const { contextId, sessionId } = await this.createFrameContextWithRetry(client, frameId);
+    return await this.evaluateInFrameContext(client, contextId, expression, true, true, sessionId)
   }
 
   private async clickInFrame(
@@ -434,7 +477,7 @@ export class ChromiumDebugAdapter extends BaseAdapter {
     selector: string
   ): Promise<RuntimeEvaluateResult> {
     const frameId = await this.getFrameIdForIframe(client, iframeSelector);
-    const contextId = await this.createFrameContext(client, frameId);
+    const { contextId, sessionId } = await this.createFrameContextWithRetry(client, frameId);
 
     return await this.evaluateInFrameContext(
       client,
@@ -448,7 +491,8 @@ export class ChromiumDebugAdapter extends BaseAdapter {
         })()
       `,
       true,
-      true
+      true,
+      sessionId
     );
   }
 
@@ -459,7 +503,7 @@ export class ChromiumDebugAdapter extends BaseAdapter {
     value: string | number
   ): Promise<RuntimeEvaluateResult> {
     const frameId = await this.getFrameIdForIframe(client, iframeSelector);
-    const contextId = await this.createFrameContext(client, frameId);
+    const { contextId, sessionId } = await this.createFrameContextWithRetry(client, frameId);
 
     return await this.evaluateInFrameContext(
       client,
@@ -481,7 +525,8 @@ export class ChromiumDebugAdapter extends BaseAdapter {
         })()
       `,
       true,
-      true
+      true,
+      sessionId
     );
   }
 
@@ -719,7 +764,7 @@ export class ChromiumDebugAdapter extends BaseAdapter {
     hasControls: boolean;
   }> {
     const frameId = await this.getFrameIdForIframe(client, iframeSelector);
-    const contextId = await this.createFrameContext(client, frameId);
+    const { contextId, sessionId } = await this.createFrameContextWithRetry(client, frameId);
 
     const result = await this.evaluateInFrameContext(
       client,
@@ -743,7 +788,8 @@ export class ChromiumDebugAdapter extends BaseAdapter {
         })()
       `,
       true,
-      true
+      true,
+      sessionId
     );
 
     return (result?.result?.value ?? {}) as {
@@ -764,6 +810,7 @@ export class ChromiumDebugAdapter extends BaseAdapter {
       timeoutMs?: number;
       pollMs?: number;
       requiredFrameSelector?: string | null;
+      expectedIframeSrcIncludes?: string | null;
     }
   ): Promise<{
     ok: boolean;
@@ -786,10 +833,14 @@ export class ChromiumDebugAdapter extends BaseAdapter {
         const hostState = await this.getIframeHostState(client, iframeSelector, loadingSelector);
         lastHostState = hostState;
 
+
+        const expectedIframeSrcIncludes = options?.expectedIframeSrcIncludes ?? null;
+
         const hostReady =
           hostState.iframeFound &&
           !!hostState.iframeSrc &&
-          hostState.loadingVisible === false;
+          hostState.loadingVisible === false &&
+          (!expectedIframeSrcIncludes || hostState.iframeSrc.includes(expectedIframeSrcIncludes));
 
         if (!hostReady) {
           await new Promise((resolve) => setTimeout(resolve, pollMs));
@@ -800,7 +851,10 @@ export class ChromiumDebugAdapter extends BaseAdapter {
         lastFrameState = frameState;
 
         const frameReady =
-          (frameState.readyState === "interactive" || frameState.readyState === "complete");
+          (frameState.readyState === "interactive" || frameState.readyState === "complete") &&
+          !!frameState.href &&
+          frameState.href !== "about:blank";
+
 
         if (!frameReady) {
           await new Promise((resolve) => setTimeout(resolve, pollMs));
@@ -831,6 +885,9 @@ export class ChromiumDebugAdapter extends BaseAdapter {
       await new Promise((resolve) => setTimeout(resolve, pollMs));
     }
 
+
+    console.log("Web frame snapshot:", client.webFrames.getFrameDebugSnapshot());
+
     return {
       ok: false,
       iframeSelector,
@@ -858,7 +915,7 @@ export class ChromiumDebugAdapter extends BaseAdapter {
 
     console.log(`Resolved frameId ${frameId} for iframe selector ${iframeSelector}`);
 
-    const contextId = await this.createFrameContext(client, frameId);
+    const { contextId, sessionId } = await this.createFrameContextWithRetry(client, frameId);
 
     console.log(`Created execution context ${contextId} for frameId ${frameId} (iframe selector: ${iframeSelector})`);
 
@@ -883,7 +940,8 @@ export class ChromiumDebugAdapter extends BaseAdapter {
       })()
     `,
     true,
-    true
+    true,
+    sessionId
   );
 
   console.log("Iframe element inventory:", JSON.stringify(frameElements, null, 2));
@@ -914,7 +972,8 @@ export class ChromiumDebugAdapter extends BaseAdapter {
         })()
       `,
       true,
-      true
+      true,
+      sessionId
     );
 
     const value = (result?.result?.value ?? {}) as any;
@@ -931,18 +990,12 @@ export class ChromiumDebugAdapter extends BaseAdapter {
     };
   }
 
-  private async canUseFrameInCurrentSession(
-    client: CdpClient,
-    frameId: string
-  ): Promise<boolean> {
-    try {
-      const tree = await client.send("Page.getFrameTree");
-      const json = JSON.stringify(tree);
-      return json.includes(frameId);
-    } catch {
-      return false;
-    }
-  }
+private async canUseFrameInCurrentSession(
+  client: CdpClient,
+  frameId: string
+): Promise<boolean> {
+  return client.webFrames.getSessionIdForFrame(frameId) != null;
+}
 
   private async querySelectorAllInFrame(
     client: CdpClient,
@@ -961,7 +1014,7 @@ export class ChromiumDebugAdapter extends BaseAdapter {
     }>;
   }> {
     const frameId = await this.getFrameIdForIframe(client, iframeSelector);
-    const contextId = await this.createFrameContext(client, frameId);
+    const { contextId, sessionId } = await this.createFrameContextWithRetry(client, frameId);
 
     const result = await this.evaluateInFrameContext(
       client,
@@ -982,7 +1035,9 @@ export class ChromiumDebugAdapter extends BaseAdapter {
         })()
       `,
       true,
-      true
+      true,
+      sessionId
+
     );
 
     const value = (result?.result?.value ?? {}) as any;
@@ -1088,7 +1143,7 @@ export class ChromiumDebugAdapter extends BaseAdapter {
     const iframeTop = Math.min(iframeQuad[1], iframeQuad[3], iframeQuad[5], iframeQuad[7]);
 
     const frameId = await this.getFrameIdForIframe(client, iframeSelector);
-    const contextId = await this.createFrameContext(client, frameId);
+    const { contextId, sessionId } = await this.createFrameContextWithRetry(client, frameId);
 
     const localPointResult = await this.evaluateInFrameContext(
       client,
@@ -1110,7 +1165,9 @@ export class ChromiumDebugAdapter extends BaseAdapter {
         })()
       `,
       true,
-      true
+      true,
+      sessionId
+
     );
 
     const point = localPointResult?.result?.value as any;
