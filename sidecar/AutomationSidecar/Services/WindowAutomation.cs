@@ -114,7 +114,7 @@ public static class WindowAutomation
         }
     }
 
-    public static void RestoreAndFocusProcessWindow(int processId)
+    public static IntPtr RestoreAndFocusProcessWindow(int processId)
     {
         var hwnd = FindMainWindowForProcess(processId);
         if (hwnd == IntPtr.Zero)
@@ -122,6 +122,7 @@ public static class WindowAutomation
 
         ShowWindow(hwnd, SW_RESTORE);
         BringWindowToFront(hwnd);
+        return hwnd;
     }
 
     public static object TransformWindow(

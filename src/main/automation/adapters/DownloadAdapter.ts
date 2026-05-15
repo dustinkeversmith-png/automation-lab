@@ -5,7 +5,8 @@ export type DownloadStatus =
   | "pending"
   | "in-progress"
   | "completed"
-  | "failed";
+  | "failed"
+  | "cancelled";
 
 export type DownloadInfo = {
   id: string;
@@ -36,6 +37,12 @@ export type DownloadOptions = {
   signal?: AbortSignal;
 };
 
+export type DownloadHandle = {
+  id: string;
+  info: DownloadInfo;
+  promise: Promise<DownloadInfo>;
+};
+
 export class DownloadAdapter {
   private readonly downloads = new Map<string, DownloadInfo>();
   private nextId = 1;
@@ -43,8 +50,7 @@ export class DownloadAdapter {
 
   constructor(defaultDownloadDir?: string) {
     this.defaultDownloadDir =
-      defaultDownloadDir ??
-      path.join(process.cwd(), "downloads");
+      defaultDownloadDir ?? path.join(process.cwd(), "downloads");
   }
 
   getDownload(id: string): DownloadInfo | undefined {
@@ -58,17 +64,21 @@ export class DownloadAdapter {
 
   clearFinished(): void {
     for (const [id, info] of this.downloads.entries()) {
-      if (info.status === "completed" || info.status === "failed") {
+      if (
+        info.status === "completed" ||
+        info.status === "failed" ||
+        info.status === "cancelled"
+      ) {
         this.downloads.delete(id);
       }
     }
   }
 
-  async download(
+  download(
     url: string,
     fileName: string,
     options: DownloadOptions
-  ): Promise<DownloadInfo> {
+  ): DownloadHandle {
     const id = `download-${this.nextId++}`;
     const targetDir = options.downloadDir ?? this.defaultDownloadDir;
 
@@ -94,20 +104,47 @@ export class DownloadAdapter {
 
     this.downloads.set(id, info);
 
+    const promise = this.runDownload(id, options);
+
+    return {
+      id,
+      info: { ...info },
+      promise,
+    };
+  }
+
+  private async runDownload(
+    id: string,
+    options: DownloadOptions
+  ): Promise<DownloadInfo> {
+    const existing = this.downloads.get(id);
+    if (!existing) {
+      throw new Error(`No download found for id ${id}`);
+    }
+
+    const info = { ...existing };
+
     try {
+      if (options.signal?.aborted) {
+        throw new Error(`Download aborted before start for ${info.url}`);
+      }
+
       info.status = "in-progress";
+      this.updateDownload(info);
       this.emitProgress(options, info);
 
-      const response = await fetch(url, {
+      const response = await fetch(info.url, {
         signal: options.signal,
       });
 
       if (!response.ok) {
-        throw new Error(`Download failed with HTTP ${response.status} for ${url}`);
+        throw new Error(
+          `Download failed with HTTP ${response.status} for ${info.url}`
+        );
       }
 
       if (!response.body) {
-        throw new Error(`Download response had no body for ${url}`);
+        throw new Error(`Download response had no body for ${info.url}`);
       }
 
       const contentLengthHeader = response.headers.get("content-length");
@@ -116,9 +153,10 @@ export class DownloadAdapter {
         : NaN;
 
       info.totalBytes = Number.isFinite(totalBytes) ? totalBytes : null;
-      this.downloads.set(id, { ...info });
+      this.updateDownload(info);
+      this.emitProgress(options, info);
 
-      const writer = fs.createWriteStream(filePath);
+      const writer = fs.createWriteStream(info.filePath);
       const reader = response.body.getReader();
 
       try {
@@ -130,11 +168,12 @@ export class DownloadAdapter {
           }
 
           if (options.signal?.aborted) {
-            throw new Error(`Download aborted for ${url}`);
+            throw new Error(`Download aborted for ${info.url}`);
           }
 
           if (value && value.length > 0) {
             await this.writeChunk(writer, value);
+
             info.bytesReceived += value.length;
 
             if (info.totalBytes && info.totalBytes > 0) {
@@ -146,7 +185,7 @@ export class DownloadAdapter {
               info.percent = 0;
             }
 
-            this.downloads.set(id, { ...info });
+            this.updateDownload(info);
             this.emitProgress(options, info);
           }
         }
@@ -156,8 +195,8 @@ export class DownloadAdapter {
         writer.destroy();
 
         try {
-          if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
+          if (fs.existsSync(info.filePath)) {
+            fs.unlinkSync(info.filePath);
           }
         } catch {
           // ignore cleanup failure
@@ -170,7 +209,7 @@ export class DownloadAdapter {
       info.percent = 100;
       info.finishedAt = Date.now();
 
-      this.downloads.set(id, { ...info });
+      this.updateDownload(info);
       options.onFinish({ ...info });
 
       return { ...info };
@@ -178,15 +217,34 @@ export class DownloadAdapter {
       const normalized =
         error instanceof Error ? error : new Error(String(error));
 
-      info.status = "failed";
+      const wasAborted =
+        normalized.message.includes("aborted") ||
+        normalized.name === "AbortError";
+
+      info.status = wasAborted ? "cancelled" : "failed";
       info.error = normalized;
       info.finishedAt = Date.now();
 
-      this.downloads.set(id, { ...info });
+      try {
+        if (fs.existsSync(info.filePath)) {
+          const stat = fs.statSync(info.filePath);
+          if (stat.size === 0) {
+            fs.unlinkSync(info.filePath);
+          }
+        }
+      } catch {
+        // ignore cleanup failure
+      }
+
+      this.updateDownload(info);
       options.onError(normalized);
 
       return { ...info };
     }
+  }
+
+  private updateDownload(info: DownloadInfo): void {
+    this.downloads.set(info.id, { ...info });
   }
 
   private emitProgress(options: DownloadOptions, info: DownloadInfo): void {

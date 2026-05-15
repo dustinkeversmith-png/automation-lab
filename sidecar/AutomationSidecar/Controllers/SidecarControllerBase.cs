@@ -19,7 +19,9 @@ public abstract class SidecarControllerBase
 
     public abstract bool CanHandle(string method);
 
-    public abstract Task<object?> HandleAsync(CommandEnvelope cmd, CancellationToken cancellationToken = default);
+    public abstract Task<object?> HandleAsync(
+        CommandEnvelope cmd,
+        CancellationToken cancellationToken = default);
 
     protected static int GetRequiredInt32(CommandEnvelope cmd, string key)
     {
@@ -78,7 +80,10 @@ public abstract class SidecarControllerBase
         return string.IsNullOrWhiteSpace(value) ? null : value;
     }
 
-    protected static bool GetOptionalBoolean(CommandEnvelope cmd, string key, bool defaultValue = false)
+    protected static bool GetOptionalBoolean(
+        CommandEnvelope cmd,
+        string key,
+        bool defaultValue = false)
     {
         if (cmd.Params is null || !cmd.Params.TryGetValue(key, out var el))
             return defaultValue;
@@ -107,9 +112,9 @@ public abstract class SidecarControllerBase
             if (item.ValueKind != JsonValueKind.String)
                 throw new InvalidOperationException($"Param '{key}' must contain only strings");
 
-            var s = item.GetString();
-            if (!string.IsNullOrWhiteSpace(s))
-                values.Add(s);
+            var value = item.GetString();
+            if (!string.IsNullOrWhiteSpace(value))
+                values.Add(value);
         }
 
         return values.ToArray();

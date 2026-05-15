@@ -2,7 +2,11 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { DownloadAdapter, type DownloadInfo } from "../src/main/automation/adapters/DownloadAdapter";
+import {
+  DownloadAdapter,
+  type DownloadInfo,
+  type DownloadHandle,
+} from "../src/main/automation/adapters/DownloadAdapter";
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) {
@@ -12,6 +16,24 @@ function assert(condition: unknown, message: string): asserts condition {
 
 async function sleep(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function logDownloadSnapshot(adapter: DownloadAdapter): void {
+  const downloads = adapter.getAllDownloads();
+
+  console.log("\n=== download snapshot ===");
+  console.dir(
+    downloads.map((item) => ({
+      id: item.id,
+      status: item.status,
+      percent: item.percent,
+      bytesReceived: item.bytesReceived,
+      totalBytes: item.totalBytes,
+      fileName: item.fileName,
+      filePath: item.filePath,
+    })),
+    { depth: 6 }
+  );
 }
 
 async function waitForDownloadToFinish(
@@ -36,7 +58,11 @@ async function waitForDownloadToFinish(
         filePath: last.filePath,
       });
 
-      if (last.status === "completed" || last.status === "failed") {
+      if (
+        last.status === "completed" ||
+        last.status === "failed" ||
+        last.status === "cancelled"
+      ) {
         return last;
       }
     }
@@ -63,7 +89,7 @@ async function main() {
   );
 
   console.log("==================================================");
-  console.log("DownloadAdapter smoke test");
+  console.log("DownloadAdapter live smoke test");
   console.log("==================================================");
   console.log("Target URL:", targetUrl);
   console.log("Requested file name:", requestedFileName);
@@ -74,10 +100,13 @@ async function main() {
   let finishedInfo: DownloadInfo | null = null;
   let finishedCalled = false;
   let errorCalled = false;
+  let progressCalls = 0;
 
-  const startedPromise = adapter.download(targetUrl, requestedFileName, {
+  const handle: DownloadHandle = adapter.download(targetUrl, requestedFileName, {
     downloadDir,
     onProgress(info) {
+      progressCalls += 1;
+
       console.log("[onProgress]", {
         id: info.id,
         status: info.status,
@@ -105,33 +134,52 @@ async function main() {
     },
   });
 
-  const immediateInfo = await startedPromise;
+  console.log("\n=== returned download handle ===");
+  console.dir(
+    {
+      id: handle.id,
+      info: handle.info,
+    },
+    { depth: 6 }
+  );
 
-  console.log("[initial returned info]");
-  console.dir(immediateInfo, { depth: 5 });
+  const immediateLookup = adapter.getDownload(handle.id);
+  assert(immediateLookup, "Expected download to be immediately tracked");
 
-  const finalInfo = await waitForDownloadToFinish(adapter, immediateInfo.id);
+  logDownloadSnapshot(adapter);
 
-  console.log("\n=== final download info ===");
-  console.dir(finalInfo, { depth: 6 });
+  const trackedFinal = await waitForDownloadToFinish(adapter, handle.id);
+  const promisedFinal = await handle.promise;
 
-  assert(finalInfo.status === "completed", "Expected download to complete");
+  console.log("\n=== tracked final info ===");
+  console.dir(trackedFinal, { depth: 6 });
+
+  console.log("\n=== promised final info ===");
+  console.dir(promisedFinal, { depth: 6 });
+
+  assert(trackedFinal.status === "completed", "Expected tracked download to complete");
+  assert(promisedFinal.status === "completed", "Expected promised download to complete");
   assert(finishedCalled, "Expected onFinish to have been called");
   assert(!errorCalled, "Did not expect onError to be called");
+  assert(progressCalls > 0, "Expected onProgress to be called at least once");
   assert(finishedInfo != null, "Expected finishedInfo to be populated");
-  assert(fs.existsSync(finalInfo.filePath), "Expected downloaded file to exist");
+  assert(fs.existsSync(promisedFinal.filePath), "Expected downloaded file to exist");
 
-  const stat = fs.statSync(finalInfo.filePath);
+  const stat = fs.statSync(promisedFinal.filePath);
+
   console.log("\n=== downloaded file stats ===");
   console.dir(
     {
-      filePath: finalInfo.filePath,
+      filePath: promisedFinal.filePath,
       size: stat.size,
     },
     { depth: 4 }
   );
 
   assert(stat.size > 0, "Expected downloaded file size to be > 0");
+  assert(promisedFinal.percent === 100, "Expected final percent to be 100");
+
+  logDownloadSnapshot(adapter);
 
   console.log("\nSmoke test completed successfully.");
 }
